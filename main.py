@@ -17,6 +17,16 @@ from pydantic import BaseModel
 DOWNLOAD_DIR = Path("/tmp/htk_downloads")
 DOWNLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
+
+def ensure_cookies():
+    """環境変数 YT_COOKIES を cookies.txt に書き出す"""
+    raw = os.environ.get("YT_COOKIES", "").strip()
+    if not raw:
+        return None
+    path = DOWNLOAD_DIR / "cookies.txt"
+    path.write_text(raw, encoding="utf-8")
+    return str(path)
+
 app = FastAPI(title="HTK API")
 
 # ─── ジョブ管理 ───
@@ -39,7 +49,6 @@ class DownloadRequest(BaseModel):
     trim_start: Optional[str] = None  # "00:01:30"
     trim_end: Optional[str] = None
 
-
 # ─── ヘルパー ───
 def seconds_to_str(s: int) -> str:
     if not s:
@@ -59,6 +68,9 @@ def build_ytdlp_args(req: DownloadRequest, out_path: Path) -> list[str]:
     args = [sys.executable, "-m", "yt_dlp", "--no-playlist",
             "--no-warnings", "--socket-timeout", "10",
             "--retries", "1", "--extractor-retries", "1", "--file-access-retries", "1"]
+    cookie_file = ensure_cookies()
+    if cookie_file:
+        args += ["--cookies", cookie_file]
 
     # フォーマット選択
     if req.media_type == "audio":
@@ -100,11 +112,15 @@ def build_ytdlp_args(req: DownloadRequest, out_path: Path) -> list[str]:
 @app.post("/api/info")
 async def get_info(req: InfoRequest):
     try:
+        cookie_file = ensure_cookies()
+        cmd = [sys.executable, "-m", "yt_dlp", "--dump-json", "--no-playlist",
+               "--no-warnings", "--skip-download", "--socket-timeout", "10",
+               "--retries", "1", "--extractor-retries", "1", "--file-access-retries", "1"]
+        if cookie_file:
+            cmd += ["--cookies", cookie_file]
+        cmd.append(req.url)
         proc = await asyncio.create_subprocess_exec(
-            sys.executable, "-m", "yt_dlp", "--dump-json", "--no-playlist",
-            "--no-warnings", "--skip-download", "--socket-timeout", "10",
-            "--retries", "1", "--extractor-retries", "1", "--file-access-retries", "1",
-            req.url,
+            *cmd,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
@@ -129,7 +145,7 @@ async def get_info(req: InfoRequest):
             "description": (data.get("description") or "")[:200],
         }
     except asyncio.TimeoutError:
-        raise HTTPException(status_code=504, detail="タイムアウト（20秒） - HF Spaces から YouTube に接続できていません")
+        raise HTTPException(status_code=504, detail="タイムアウト（20秒） - YouTube への接続に失敗しました。YT_COOKIES が正しいか確認してください")
     except HTTPException:
         raise
     except Exception as e:
