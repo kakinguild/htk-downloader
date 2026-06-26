@@ -23,6 +23,13 @@ def ensure_cookies():
     raw = os.environ.get("YT_COOKIES", "").strip()
     if not raw:
         return None
+    # Base64 encoded の場合もある
+    if re.fullmatch(r'[A-Za-z0-9+/=]+', raw) and len(raw) > 100:
+        import base64
+        try:
+            raw = base64.b64decode(raw).decode("utf-8")
+        except Exception:
+            pass
     path = DOWNLOAD_DIR / "cookies.txt"
     path.write_text(raw, encoding="utf-8")
     return str(path)
@@ -243,6 +250,25 @@ async def get_file(job_id: str):
         filename=fp.name.split("_", 2)[-1],   # job_id_ プレフィックスを除去
         media_type="application/octet-stream",
     )
+
+
+# ─── クッキーテスト ───
+@app.get("/api/debug-cookies")
+async def debug_cookies():
+    cookie_file = ensure_cookies()
+    if not cookie_file:
+        return {"status": "no_cookies", "YT_COOKIES_set": bool(os.environ.get("YT_COOKIES"))}
+    content = Path(cookie_file).read_text(encoding="utf-8")
+    lines = content.splitlines()
+    return {
+        "status": "found",
+        "path": cookie_file,
+        "lines": len(lines),
+        "size": len(content),
+        "first_3_lines": lines[:3],
+        "starts_with_netscape": content.startswith("#"),
+        "sample": content[:500],
+    }
 
 
 # ─── 診断 ───
