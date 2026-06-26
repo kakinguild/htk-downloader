@@ -31,6 +31,8 @@ def ensure_cookies():
         except Exception:
             pass
     path = DOWNLOAD_DIR / "cookies.txt"
+    if not raw.startswith("#"):
+        raw = "# Netscape HTTP Cookie File\n" + raw
     path.write_text(raw, encoding="utf-8")
     return str(path)
 
