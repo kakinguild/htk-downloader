@@ -86,15 +86,12 @@ def build_ytdlp_args(req: DownloadRequest, out_path: Path) -> list[str]:
         args += ["-x", f"--audio-format", req.format,
                  "--audio-quality", "0"]
     else:
-        if req.quality == "best":
-            fmt = "bestvideo+bestaudio/best"
-        elif req.quality == "worst":
-            fmt = "worstvideo+worstaudio/worst"
+        if req.quality == "worst":
+            args += ["-f", "worst"]
+        elif req.quality == "best":
+            args += ["-f", "best"]
         else:
-            fmt = (f"bestvideo[height<={req.quality}]+bestaudio/"
-                   f"best[height<={req.quality}]/"
-                   f"bestvideo+bestaudio/best")
-        args += ["-f", fmt]
+            args += ["-f", f"best[height<={req.quality}]/best"]
 
         # コンテナ変換
         if req.format not in ("webm",):
