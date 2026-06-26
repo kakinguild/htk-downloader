@@ -88,8 +88,12 @@ def build_ytdlp_args(req: DownloadRequest, out_path: Path) -> list[str]:
     else:
         if req.quality == "best":
             fmt = "bestvideo+bestaudio/best"
+        elif req.quality == "worst":
+            fmt = "worstvideo+worstaudio/worst"
         else:
-            fmt = f"bestvideo[height<={req.quality}]+bestaudio/best[height<={req.quality}]"
+            fmt = (f"bestvideo[height<={req.quality}]+bestaudio/"
+                   f"best[height<={req.quality}]/"
+                   f"bestvideo+bestaudio/best")
         args += ["-f", fmt]
 
         # コンテナ変換
